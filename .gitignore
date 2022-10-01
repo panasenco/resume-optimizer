@@ -31,3 +31,9 @@ dist/
 
 # typescript
 .tsbuildinfo
+
+# vim
+**/*.swp
+
+# misc
+tests/

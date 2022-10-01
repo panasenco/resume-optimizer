@@ -1,7 +1,21 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
+
+function getHello() {
+  return "hello";
+}
+
+function getTabUrl(tabs) {
+  return tabs[0].url;
+}
+
+function onError(error) {
+  console.error(`Error: ${error}`);
+}
 
 function IndexPopup() {
-  const [data, setData] = useState("")
+  const [data, setData] = useState({tabUrl: ""})
+  
+  browser.tabs.query({active: true}).then((tabs) => setData({tabUrl:tabs[0].url}))
 
   return (
     <div
@@ -17,7 +31,9 @@ function IndexPopup() {
         </a>{" "}
         Extension!
       </h2>
-      <input onChange={(e) => setData(e.target.value)} value={data} />
+      <p>
+        You're currently on {data.tabUrl}
+      </p>
       <a href="https://docs.plasmo.com" target="_blank">
         View Docs
       </a>
