@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react"
 
-function getHello() {
-  return "hello";
-}
+const jobDescriptionSelectors = ["#jobDescriptionText"];
 
-function getTabUrl(tabs) {
-  return tabs[0].url;
-}
-
-function onError(error) {
-  console.error(`Error: ${error}`);
+function getJobDescription() {
+  for (let jobDescriptionSelector of jobDescriptionSelectors) {
+    var jobDescriptionElement = document.querySelector(jobDescriptionSelector);
+    if (jobDescriptionElement) {
+      return jobDescriptionElement.innerText;
+    }
+  }
+  return "";
 }
 
 function IndexPopup() {
@@ -24,19 +24,10 @@ function IndexPopup() {
         flexDirection: "column",
         padding: 16
       }}>
-      <h2>
-        Welcome to your
-        <a href="https://www.plasmo.com" target="_blank">
-          Plasmo
-        </a>{" "}
-        Extension!
-      </h2>
+      <h2>Current job description</h2>
       <p>
-        You're currently on {data.tabUrl}
+        {getJobDescription()}
       </p>
-      <a href="https://docs.plasmo.com" target="_blank">
-        View Docs
-      </a>
     </div>
   )
 }
