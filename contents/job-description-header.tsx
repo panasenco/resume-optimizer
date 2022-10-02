@@ -1,43 +1,19 @@
 import type { PlasmoContentScript } from "plasmo"
+import { withObserver, ATTRIBUTES, CHILD_ADDED, CHARACTER_DATA } from "react-mutation-observer"
 
 export const config: PlasmoContentScript = {
   matches: ["<all_urls>"]
 }
 
-const findIndeedJobDescriptionElement = () => document.getElementById("jobDescriptionText")
+console.log("Starting resume-optimizer...")
 
-const findJobDescriptionElement = findIndeedJobDescriptionElement
+const Component = withObserver(document)
 
-const callback = (mutationList, observer) => {
-  const jobDescriptionElement = findJobDescriptionElement()
-  if (!jobDescription) {
-    // Job description element not found, quietly exit
-    console.log("Job description element not found")
-    return
-  }
-  var jobDescriptionChanged = false
-  for (const mutation of mutationList) {
-    if (mutation.target == jobDescriptionElement) {
-      console.log("Job description element changed")
-      jobDescriptionChanged = true
-      break
-    } else if (mutation.type === 'childList') {
-      for (const addedNode of mutation.addedNodes) {
-        if (addedNode == jobDescriptionElement) {
-          console.log("Job description element changed")
-          jobDescriptionChanged = true
-          break
-        }
-      }
-      if (!jobDescriptionChanged) {
-        console.log('The job description node was not changed.')
-      }
-    }
-  }
-}
-
-const observer = new MutationObserver(callback)
-
-observer.observe(document, { attributes: false, childList: true, subtree: true })
-
-console.log('Started resume-optimizer...')
+return (
+  <Component
+    observedComponent={document}
+    onMutation={console.log.bind(null, 'Child addition triggered.')}
+    categories={[ATTRIBUTES, CHILD_ADDED, CHARACTER_DATA]}
+    subtree={true}
+  />
+)
