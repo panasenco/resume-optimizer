@@ -1,5 +1,3 @@
-const leftPad = require("left-pad");
-
 const resultNode = document.getElementById("result");
 const textNode = document.getElementById("text");
 const amountNode = document.getElementById("amount");
@@ -9,7 +7,7 @@ document.getElementById("leftpad-form").addEventListener("submit", (e) => {
     e.preventDefault();
 
     console.log("padding");
-    resultNode.value = leftPad(textNode.value, amountNode.valueAsNumber, withNode.value);
+    resultNode.value = textNode.value.padStart(amountNode.valueAsNumber, withNode.value);
 }, false);
 
 document.getElementById("pad-bg").addEventListener("click", (e) => {
