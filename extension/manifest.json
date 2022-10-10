@@ -1,8 +1,8 @@
 {
     "manifest_version": 2,
-    "name": "Webpack Example",
-    "version": "1.0.0",
-    "description": "A minimal example of how to use npm modules from within a WebExtension.",
+    "name": "Resume Optimizer",
+    "version": "0.0.0-alpha",
+    "description": "Generates the optimal version of your resume for a particular job posting.",
     "icons": {
         "32": "icons/leftpad-32.png"
     },
@@ -14,5 +14,9 @@
     },
     "background": {
         "scripts": ["background_scripts/index.js"]
-    }
+    },
+    "content_scripts": [{
+        "matches": ["https://www.indeed.com/*"],
+        "js": ["content/index.js"]
+    }]
 }

@@ -1,5 +1,6 @@
 # This project
 extension/**/*.js
+**/*.swp
 
 # Logs
 logs
