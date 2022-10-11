@@ -1,7 +1,15 @@
 const insertOptimizer = (descriptionContainer) => {
   const optimizerDiv = document.createElement("div");
-  const optimizerContent = document.createTextNode("Optimizer");
-  optimizerDiv.appendChild(optimizerContent);
+  const getOptimized = document.createElement("button");
+  getOptimized.onclick = () => {
+    const pageContent = '<!DOCTYPE html><html lang="en"><body>TODO</body></html>';
+    const pageBlob = new Blob([pageContent], {type: "text/html"});
+    const pageURL = URL.createObjectURL(pageBlob);
+    window.open(pageURL, "_blank");
+  };
+  optimizerDiv.appendChild(getOptimized);
+  const getOptimizedText = document.createTextNode("Get optimized resume");
+  getOptimized.appendChild(getOptimizedText);
   descriptionContainer.prepend(optimizerDiv);
 }
 
