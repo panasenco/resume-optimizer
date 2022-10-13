@@ -11,22 +11,28 @@
             <form class="mzp-c-form" id="optimizer-form">
                 <div class="mzp-c-form-header">
                     <h2 class="mzp-c-form-title">Resume Optimizer</h2>
-		    <!-- <p>Header paragraph</p> -->
+                    <span class="mzp-c-fieldnote">Currently supported sites: <a href="https://www.indeed.com/">Indeed</a></span>
                 </div>
                 <!-- <legend class="mzp-c-form-subtitle">Subtitle</legend> -->
                 <div class="mzp-c-field">
-                    <label class="mzp-c-field-label" for="event_details">Enter your <a href="https://jsonresume.org/">JSON Resume</a> JSON <span class="mzp-c-fieldnote">Template alternatives in the JSON using <a href="https://github.com/panasenco/ambiguity">Ambiguity</a></span></label>
-                    <textarea class="mzp-c-field-control" id="resume-content" rows="10" cols="50"></textarea>
+                    <label class="mzp-c-field-label" for="resume-content">Enter your <a href="https://github.com/panasenco/ambiguity">Ambiguity</a>-templated <a href="https://jsonresume.org/">JSON Resume</a> JSON </label>
+                    <textarea class="mzp-c-field-control" name="resume-content" id="resume-content" rows="10" cols="50"></textarea>
+                </div>
+                <div class="mzp-c-field">
+                    <label class="mzp-c-field-label" for="resume-theme">Select your JSON Resume <a href="https://jsonresume.org/themes/">theme</a></label>
+                    <select class="mzp-c-field-control" name="resume-theme" id="resume-theme">
+                        <option value="onepage">OnePage</option>
+                    </select>
                 </div>
                 <footer class="mzp-c-form-footer">
                     <div class="mzp-c-button-container mzp-l-h-between">
                         <button class="mzp-c-button" type="submit">Save</button>
                         <button class="mzp-c-button mzp-t-secondary" type="reset" id="copy-to-clipboard">Copy to Clipboard</button>
-			<!-- <p class="mzp-c-button-info">Footer paragraph</p> -->
+                        <!-- <p class="mzp-c-button-info">Footer paragraph</p> -->
                     </div>
                 </footer>
             </form>
         </div>
-        <script src="index.js"/>
+	<script src="index.js"></script>
     </body>
 </html>
