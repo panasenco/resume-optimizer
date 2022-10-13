@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8"/>
+        <link rel="stylesheet" href="protocol.css"/>
+        <link rel="stylesheet" href="protocol-components.css"/>
+        <link rel="stylesheet" href="custom.css"/>
+    </head>
+    <body>
+        <div class="mzp-l-content">
+            <form class="mzp-c-form" id="optimizer-form">
+                <div class="mzp-c-form-header">
+                    <h2 class="mzp-c-form-title">Resume Optimizer</h2>
+		    <!-- <p>Header paragraph</p> -->
+                </div>
+                <!-- <legend class="mzp-c-form-subtitle">Subtitle</legend> -->
+                <div class="mzp-c-field">
+                    <label class="mzp-c-field-label" for="event_details">Enter your <a href="https://jsonresume.org/">JSON Resume</a> JSON <span class="mzp-c-fieldnote">Template alternatives in the JSON using <a href="https://github.com/panasenco/ambiguity">Ambiguity</a></span></label>
+                    <textarea class="mzp-c-field-control" id="resume-content" rows="10" cols="50"></textarea>
+                </div>
+                <footer class="mzp-c-form-footer">
+                    <div class="mzp-c-button-container mzp-l-h-between">
+                        <button class="mzp-c-button" type="submit">Save</button>
+                        <button class="mzp-c-button mzp-t-secondary" type="reset" id="copy-to-clipboard">Copy to Clipboard</button>
+			<!-- <p class="mzp-c-button-info">Footer paragraph</p> -->
+                    </div>
+                </footer>
+            </form>
+        </div>
+        <script src="index.js"/>
+    </body>
+</html>

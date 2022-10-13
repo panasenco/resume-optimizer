@@ -1,5 +1,7 @@
 # This project
 extension/**/*.js
+extension/**/*.css
+!extension/**/custom.css
 **/*.swp
 
 # Logs

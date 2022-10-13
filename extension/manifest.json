@@ -8,12 +8,12 @@
     },
     "browser_action": {
         "default_icon": "icons/leftpad-32.png",
-        "default_title": "Left Pad",
-        "default_popup": "popup/left-pad.html",
+        "default_title": "Resume Optimizer",
+        "default_popup": "popup/index.html",
         "browser_style": true
     },
     "background": {
-        "scripts": ["background_scripts/index.js"]
+        "scripts": ["background/index.js"]
     },
     "content_scripts": [{
         "matches": ["https://www.indeed.com/*"],
