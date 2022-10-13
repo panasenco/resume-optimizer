@@ -2,7 +2,6 @@ const path = require("path");
 
 module.exports = {
   entry: {
-    background: "./background-script.js",
     popup: [
       "./popup.js",
       "./node_modules/@mozilla-protocol/core/protocol/css/protocol.css",

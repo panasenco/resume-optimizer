@@ -12,11 +12,9 @@
         "default_popup": "popup/index.html",
         "browser_style": true
     },
-    "background": {
-        "scripts": ["background/index.js"]
-    },
     "content_scripts": [{
         "matches": ["https://www.indeed.com/*"],
         "js": ["content/index.js"]
-    }]
+    }],
+    "permissions": ["storage"]
 }

@@ -4,10 +4,12 @@ const insertOptimizer = (descriptionContainer) => {
   const optimizerDiv = document.createElement("div");
   const getOptimized = document.createElement("button");
   getOptimized.onclick = () => {
-    const pageContent = themes.onepage({});
-    const pageBlob = new Blob([pageContent], {type: "text/html"});
-    const pageURL = URL.createObjectURL(pageBlob);
-    window.open(pageURL, "_blank");
+    browser.storage.local.get().then((stored) => {
+      const pageContent = themes[stored.theme]({resume: JSON.parse(stored.content)});
+      const pageBlob = new Blob([pageContent], {type: "text/html"});
+      const pageURL = URL.createObjectURL(pageBlob);
+      window.open(pageURL, "_blank");
+    });
   };
   optimizerDiv.appendChild(getOptimized);
   const getOptimizedText = document.createTextNode("Generate HTML");
