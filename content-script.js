@@ -1,14 +1,16 @@
+const themes = require("jsonresume-themes");
+
 const insertOptimizer = (descriptionContainer) => {
   const optimizerDiv = document.createElement("div");
   const getOptimized = document.createElement("button");
   getOptimized.onclick = () => {
-    const pageContent = '<!DOCTYPE html><html lang="en"><body>TODO</body></html>';
+    const pageContent = themes.onepage({});
     const pageBlob = new Blob([pageContent], {type: "text/html"});
     const pageURL = URL.createObjectURL(pageBlob);
     window.open(pageURL, "_blank");
   };
   optimizerDiv.appendChild(getOptimized);
-  const getOptimizedText = document.createTextNode("Get optimized resume");
+  const getOptimizedText = document.createTextNode("Generate HTML");
   getOptimized.appendChild(getOptimizedText);
   descriptionContainer.prepend(optimizerDiv);
 }
