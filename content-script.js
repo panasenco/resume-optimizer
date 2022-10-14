@@ -1,3 +1,4 @@
+const ambiguity = require("ambiguity");
 const themes = require("jsonresume-themes");
 
 const insertOptimizer = (descriptionContainer) => {
@@ -5,7 +6,11 @@ const insertOptimizer = (descriptionContainer) => {
   const getOptimized = document.createElement("button");
   getOptimized.onclick = () => {
     browser.storage.local.get().then((stored) => {
-      const pageContent = themes[stored.theme]({resume: JSON.parse(stored.content)});
+      const parser = new ambiguity.Parser();
+      parser.feed(stored.content);
+      resumeGraph = parser.results[0];
+      const randomJSON = resumeGraph.pathToString(resumeGraph.randomPath());
+      const pageContent = themes[stored.theme]({resume: JSON.parse(randomJSON)});
       const pageBlob = new Blob([pageContent], {type: "text/html"});
       const pageURL = URL.createObjectURL(pageBlob);
       window.open(pageURL, "_blank");
