@@ -1,5 +1,16 @@
 const ambiguity = require("ambiguity");
+const skills = require("./skills.json");
 const themes = require("jsonresume-themes");
+
+// Should probably move all this into a background script after all...
+// Sort skills in order of descending length to capture "Data Warehousing" before "Data"
+sortedSkills = skills.sort((s1,s2) => s2.length - s1.length);
+// Sanitize each skill using the function from https://stackoverflow.com/a/4371855/12981893
+sanitizedSkills = sortedSkills.map((s) => s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'));
+// Create a regex that matches any skill
+skillRegex = new RegExp("\\b(" + sanitizedSkills.join("|") + ")\\b", 'g');
+// Can now find all matches with something like Array.from(str.matchAll(skillRegex))
+
 
 const insertOptimizer = (descriptionContainer) => {
   const optimizerDiv = document.createElement("div");

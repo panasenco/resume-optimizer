@@ -21,7 +21,7 @@ module.exports = {
         generator: {
           filename: "popup/[name].css",
         },
-      }
+      },
     ]
   },
   mode: 'none',
