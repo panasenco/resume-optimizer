@@ -1,4 +1,5 @@
 const ambiguity = require("ambiguity");
+const Mark = require("mark.js");
 const skills = require("./skills.json");
 const themes = require("jsonresume-themes");
 
@@ -13,24 +14,30 @@ skillRegex = new RegExp("\\b(" + sanitizedSkills.join("|") + ")\\b", 'g');
 
 
 const insertOptimizer = (descriptionContainer) => {
-  const optimizerDiv = document.createElement("div");
-  const getOptimized = document.createElement("button");
-  getOptimized.onclick = () => {
-    browser.storage.local.get().then((stored) => {
-      const parser = new ambiguity.Parser();
-      parser.feed(stored.content);
-      resumeGraph = parser.results[0];
-      const randomJSON = resumeGraph.pathToString(resumeGraph.randomPath());
-      const pageContent = themes[stored.theme]({resume: JSON.parse(randomJSON)});
-      const pageBlob = new Blob([pageContent], {type: "text/html"});
-      const pageURL = URL.createObjectURL(pageBlob);
-      window.open(pageURL, "_blank");
-    });
-  };
-  optimizerDiv.appendChild(getOptimized);
-  const getOptimizedText = document.createTextNode("Generate HTML");
-  getOptimized.appendChild(getOptimizedText);
-  descriptionContainer.prepend(optimizerDiv);
+  try {
+    const highlighter = new Mark(descriptionContainer);
+    highlighter.markRegExp(skillRegex);
+    const optimizerDiv = document.createElement("div");
+    const getOptimized = document.createElement("button");
+    getOptimized.onclick = () => {
+      browser.storage.local.get().then((stored) => {
+        const parser = new ambiguity.Parser();
+        parser.feed(stored.content);
+        resumeGraph = parser.results[0];
+        const randomJSON = resumeGraph.pathToString(resumeGraph.randomPath());
+        const pageContent = themes[stored.theme]({resume: JSON.parse(randomJSON)});
+        const pageBlob = new Blob([pageContent], {type: "text/html"});
+        const pageURL = URL.createObjectURL(pageBlob);
+        window.open(pageURL, "_blank");
+      });
+    };
+    optimizerDiv.appendChild(getOptimized);
+    const getOptimizedText = document.createTextNode("Generate HTML");
+    getOptimized.appendChild(getOptimizedText);
+    descriptionContainer.prepend(optimizerDiv);
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 var jobContainer = document.getElementById("vjs-container");
