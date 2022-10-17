@@ -8,14 +8,20 @@ browser.storage.local.get().then((stored) => {
 
 document.getElementById("optimizer-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  console.log("Saving resume content:", resumeContent.value, "and theme:", resumeTheme.value);
   browser.storage.local.set({
       content: resumeContent.value,
       theme: resumeTheme.value,
   });
 }, false);
 
-document.getElementById("copy-to-clipboard").addEventListener("click", (e) => {
+document.getElementById("template-to-clipboard").addEventListener("click", (e) => {
   e.preventDefault();
   navigator.clipboard.writeText(resumeContent.value);
+});
+
+document.getElementById("skills-to-clipboard").addEventListener("click", (e) => {
+  e.preventDefault();
+  browser.storage.local.get(["skills"]).then((stored) => {
+    navigator.clipboard.writeText(JSON.stringify(stored.skills, null, "\n").replace(/\n\n/g,"\n"));
+  });
 });
