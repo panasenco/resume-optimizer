@@ -3,7 +3,7 @@ const binarySearch = require("binary-search");
 // Compare skills first in order of decreasing length and then alphabetically
 function skillCompare(skill0, skill1) {
   let lengthDiff = skill1.length - skill0.length;
-  return lengthDiff == 0 ? skill0.toLowerCase().localeCompare(skill1.toLowerCase()) : lengthDiff;
+  return lengthDiff == 0 ? skill0.localeCompare(skill1) : lengthDiff;
 }
 
 // Set default values for stored data if they don't exist
@@ -39,7 +39,7 @@ browser.menus.create(
 // Handle context menu click
 browser.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "toggle-skill") {
-    let skill = info.selectionText.trim();
+    let skill = info.selectionText.trim().toLowerCase();
     browser.storage.local.get(["skills"]).then((stored) => { 
       memberIndex = binarySearch(stored.skills, skill, skillCompare);
       if (memberIndex >= 0) {
