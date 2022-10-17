@@ -1,10 +1,18 @@
 const ambiguity = require("ambiguity");
+const BitSet = require("bitset");
 const Mark = require("mark.js");
 const themes = require("jsonresume-themes");
+
+const utils = require("./utils.js");
+
+function sanitizeSkill(skill) {
+  return skill.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+}
 
 class JobDescriptionUpdater {
   constructor(getDescriptionContainer) {
     this._descriptionContainer = null;
+    this.optimalResumeJSON = null;
     browser.storage.local.onChanged.addListener(this.optimize.bind(this));
   }
   
@@ -15,15 +23,15 @@ class JobDescriptionUpdater {
   set descriptionContainer(container) {
     this._descriptionContainer = container;
     this.optimize();
-    browser.storage.local.get(["content", "theme"]).then((stored) => {
+    browser.storage.local.get(["theme"]).then((stored) => {
       let optimizerDiv = document.createElement("div");
       let getOptimized = document.createElement("button");
       getOptimized.onclick = () => {
-        let parser = new ambiguity.Parser();
-        parser.feed(stored.content);
-        let resumeGraph = parser.results[0];
-        let randomJSON = resumeGraph.pathToString(resumeGraph.randomPath());
-        let pageContent = themes[stored.theme]({resume: JSON.parse(randomJSON)});
+        if (!this.optimalResumeJSON) {
+	  alert("ERROR: Optimal resume not computed.\nPlease reload the page and try again.");
+	  return;
+	}
+        let pageContent = themes[stored.theme]({resume: this.optimalResumeJSON});
         let pageBlob = new Blob([pageContent], {type: "text/html"});
         let pageURL = URL.createObjectURL(pageBlob);
         window.open(pageURL, "_blank");
@@ -40,15 +48,46 @@ class JobDescriptionUpdater {
       console.warn("JobDescriptionUpdater.optimize() called but no descriptionContainer defined yet - ignoring...");
       return;
     }
-    browser.storage.local.get(["skills"]).then((stored) => {
+    browser.storage.local.get(["content", "skills"]).then((stored) => {
       // Sanitize each skill using the function from https://stackoverflow.com/a/4371855/12981893
-      const sanitizedSkills = stored.skills.map((s) => s.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'));
+      let sanitizedSkills = stored.skills.map(sanitizeSkill);
       // Create a regex that matches any skill
-      const skillRegex = new RegExp("\\b(" + sanitizedSkills.join("|") + ")\\b", 'gi');
-      // Can now find all matches with something like Array.from(str.matchAll(skillRegex))
-      const highlighter = new Mark(this.descriptionContainer);
+      let skillRegex = new RegExp("\\b(" + sanitizedSkills.join("|") + ")\\b", 'gi');
+      // Populate set of job skills while highlighting them in the job description
+      let jobSkillSet = new Set();
+      let highlighter = new Mark(this.descriptionContainer);
       highlighter.unmark();
-      highlighter.markRegExp(skillRegex);
+      highlighter.markRegExp(
+        skillRegex,
+        {
+          each: (element) => jobSkillSet.add(element.innerText.toLowerCase()),
+	}
+      );
+      let jobSkills = [...jobSkillSet].sort(utils.skillCompare);
+      let sanitizedJobSkills = jobSkills.map(sanitizeSkill)
+      let jobSkillRegex = new RegExp("\\b((" + sanitizedJobSkills.join(")|(") + "))\\b", 'gi');
+      console.log(jobSkillRegex);
+      // Parse the resume template
+      let parser = new ambiguity.Parser();
+      parser.feed(stored.content);
+      let resumeGraph = parser.results[0];
+      // Find which job skills are present in each node (not checking across nodes)
+      resumeGraph.forEachNode((node, attributes) => {
+        let skillVector = new BitSet("0".repeat(jobSkills.length));
+        let matches = attributes.text.matchAll(jobSkillRegex);
+        if (matches) {
+          for (let match of matches) {
+            for (let i = 0; i < match.length - 2; i++) {
+              if (match[i+2]) {
+                skillVector.set(i);
+              }
+	    }
+	  }
+	}
+	resumeGraph.setNodeAttribute(node, 'skillVector', skillVector);
+        console.debug("Node match vector:", attributes.text, skillVector.toString());
+      });
+      this.optimalResumeJSON = JSON.parse(resumeGraph.pathToString(resumeGraph.randomPath()));
     });
   }
 }

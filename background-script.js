@@ -1,10 +1,6 @@
 const binarySearch = require("binary-search");
 
-// Compare skills first in order of decreasing length and then alphabetically
-function skillCompare(skill0, skill1) {
-  let lengthDiff = skill1.length - skill0.length;
-  return lengthDiff == 0 ? skill0.localeCompare(skill1) : lengthDiff;
-}
+const utils = require("./utils.js");
 
 // Set default values for stored data if they don't exist
 browser.storage.local.get().then((stored) => { 
@@ -41,7 +37,7 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "toggle-skill") {
     let skill = info.selectionText.trim().toLowerCase();
     browser.storage.local.get(["skills"]).then((stored) => { 
-      memberIndex = binarySearch(stored.skills, skill, skillCompare);
+      memberIndex = binarySearch(stored.skills, skill, utils.skillCompare);
       if (memberIndex >= 0) {
         // Skill already present, delete it from the array
         stored.skills.splice(memberIndex, 1);
