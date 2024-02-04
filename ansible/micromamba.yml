@@ -1,0 +1,88 @@
+
+- name: Install Micromamba
+  hosts: localhost
+  become: yes
+  tasks:
+    - name: Check for Micromamba already being present in /usr/local/bin
+      ansible.builtin.stat:
+        path: /usr/local/bin/micromamba
+      register: micromamba_executable
+    - name: Download Micromamba
+      when: not micromamba_executable.stat.exists
+      ansible.builtin.get_url:
+        url: https://micro.mamba.pm/api/micromamba/linux-64/latest
+        dest: "/tmp/micromamba.tar.gz"
+        mode: "0666"
+    - name: Install Micromamba
+      when: not micromamba_executable.stat.exists
+      ansible.builtin.unarchive:
+        remote_src: true
+        src: /tmp/micromamba.tar.gz
+        dest: /usr/local
+        include:
+          - bin/micromamba
+        mode: "0751"
+    - name: Fix /usr/local/bin permissions
+      ansible.builtin.file:
+        path: /usr/local/bin
+        state: directory
+        mode: "0755"
+    - name: Clean up downloaded file
+      ansible.builtin.file:
+        path: /tmp/micromamba.tar.gz
+        state: absent
+  tags:
+    - conda
+
+- name: Create Micromamba environments
+  hosts: localhost
+  vars:
+    conda_root: "/opt/resume_optimizer/conda"
+    is_development: no
+    file_regex: >-
+      ^([^\.]*).*
+    conda_environments: >-
+      {{
+        conda_environment_files.files
+        | map(attribute='path')
+        | map('basename')
+        | map('regex_replace', file_regex, '\1')
+        | zip(conda_environment_files.files
+        | map(attribute='path'))
+      }}
+  tasks:
+    - name: Create a directory for the conda root
+      ansible.builtin.file:
+        path: "{{ conda_root }}"
+        state: directory
+        mode: "0775"
+    - name: Get list of conda environment files
+      ansible.builtin.find:
+        paths: ../conda/
+        patterns:
+          - '*.yml'
+          - '*.yml.j2'
+      register: conda_environment_files
+    - name: Create a directory for conda environment declarations
+      ansible.builtin.file:
+        path: "{{ conda_root }}/envs"
+        state: directory
+        mode: "0775"
+    - name: Copy in conda environment files
+      ansible.builtin.template:
+        src: "{{ item[1] }}"
+        dest: "{{ conda_root }}/envs/{{ item[0] }}.yml"
+        mode: "0664"
+      loop: "{{ conda_environments }}"
+      register: conda_env_files
+    - name: Initialize micromamba and create conda environments
+      ansible.builtin.shell:
+        cmd: |-
+          eval "$(./bin/micromamba shell hook -s posix)"
+          micromamba shell init --shell bash
+          {% for item in conda_environments %}
+          micromamba create -y -f "{{ conda_root }}/envs/{{ item[0] }}.yml"
+          {% endfor %}
+      when: conda_env_files.changed
+  tags:
+    - conda

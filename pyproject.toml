@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resume_optimizer"
+description = "Use AI to ensure your resume passes ATS keyword screening."
+dynamic = ["version"]
+dependencies = [
+]
+requires-python = ">=3.12"
+classifiers = [
+  "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+]
+readme = "README.md"
+
+[project.optional-dependencies]
+dev = [
+  "black",
+]
+
+[tool.black]
+line-length = 120
+
+[tool.setuptools.packages.find]
+include = ["resume_optimizer"]
+namespaces = false

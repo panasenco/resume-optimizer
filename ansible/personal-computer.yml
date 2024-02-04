@@ -1,0 +1,5 @@
+- name: Set up non-GUI applications and working directory
+  ansible.builtin.import_playbook: system.yml
+
+- name: Install Micromamba
+  ansible.builtin.import_playbook: micromamba.yml

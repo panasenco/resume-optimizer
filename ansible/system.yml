@@ -1,0 +1,30 @@
+
+- name: Install apt packages
+  hosts: localhost
+  become: yes
+  tasks:
+    - name: Update and upgrade all packages
+      ansible.builtin.apt:
+        update_cache: yes
+        upgrade: yes
+        cache_valid_time: 86400 # one day
+    - name: Install APT packages
+      ansible.builtin.apt:
+        name:
+          - bzip2
+        update_cache: yes
+        state: latest
+
+- name: Set up working directory
+  hosts: localhost
+  become: yes
+  vars:
+    user: "{{ lookup('env', 'USER') }}"
+  tasks:
+    - name: Set up working directory in /opt
+      ansible.builtin.file:
+        path: "/opt/resume_optimizer"
+        state: directory
+        owner: "{{ user }}"
+        group: "{{ user }}"
+        mode: "0755"
