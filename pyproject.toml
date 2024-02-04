@@ -18,10 +18,10 @@ readme = "README.md"
 
 [project.optional-dependencies]
 dev = [
-  "black",
+  "ruff",
 ]
 
-[tool.black]
+[tool.ruff]
 line-length = 120
 
 [project.scripts]
