@@ -1,10 +1,15 @@
 # Developing resume_optimizer
 
-## Pre-requisites
-Follow the instructions in [ansible/README.md](../ansible/README.md).
+## Setup
 
-## Developing
+### VS Code Dev Containers / GitHub Codespaces
+
+In VS Code, reopen the project in a devcontainer.
+Alternatively, open GitHub Codespaces.
+Your project should be automatically installed.
+
+### Just pip
+
 ```
-micromamba activate resume_optimizer
 pip install -e .[dev]
 ```
