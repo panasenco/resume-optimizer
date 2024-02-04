@@ -1,0 +1,6 @@
+// For format details, see https://aka.ms/devcontainer.json.
+{
+	"name": "resume-optimizer",
+	"image": "mcr.microsoft.com/devcontainers/python:3.12",
+	"updateContentCommand": "pip install -e .[dev]"
+}
