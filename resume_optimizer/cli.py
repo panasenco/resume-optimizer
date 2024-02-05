@@ -25,7 +25,7 @@ def cli():
     )
     parser.add_argument(
         "-t",
-        "--title",
+        "--job-title",
         help="Title of the job in the job description",
         required=True,
     )
@@ -43,6 +43,7 @@ def cli():
     resume = optimize_resume(
         resume=json.loads("".join(fileinput.input(files=[args.resume_file]))),
         job_description="".join(fileinput.input(files=[args.job_description_file])),
+        job_title=args.job_title,
     )
 
     # Save the updated resume to resume.json.
