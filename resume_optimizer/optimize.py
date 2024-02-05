@@ -5,7 +5,8 @@ from typing import Any
 
 from .chains import distribute_keywords, summarize_resume_sections, optimize_highlights
 
-def optimize_resume(*, resume: dict[str, Any], job_description: str) -> dict[str, Any]:
+
+def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: str) -> dict[str, Any]:
     default_highlights = [
         (
             i,
@@ -20,8 +21,9 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str) -> dict[str
         position_keywords_result = pool.apply_async(
             func=distribute_keywords,
             kwds={
-                "position_highlights": default_highlights,
                 "job_description": job_description,
+                "job_title": job_title,
+                "position_highlights": default_highlights,
             },
         )
         position_summaries_result = pool.apply_async(
@@ -56,5 +58,5 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str) -> dict[str
     # Replace the highlights with the generated ones
     for i in range(n_experiences):
         resume["work"][i]["highlights"] = optimized_highlights[i]
-    
+
     return resume

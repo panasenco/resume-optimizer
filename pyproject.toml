@@ -7,6 +7,8 @@ name = "resume_optimizer"
 description = "Use AI to ensure your resume passes ATS keyword screening."
 dynamic = ["version"]
 dependencies = [
+  "langchain >= 0.1.5, < 0.2.0",
+  "langchain-openai == 0.0.5",
 ]
 requires-python = ">=3.12"
 classifiers = [

@@ -61,7 +61,15 @@ DISTRIBUTE_KEYWORDS_CHAIN = (
                             """
                         )
                     ),
-                    HumanMessagePromptTemplate.from_template(template="{job_description}"),
+                    HumanMessagePromptTemplate.from_template(
+                        template=dedent(
+                            """
+                            Job Title: {job_title}
+                            Job Description:
+                            {job_description}
+                            """
+                        )
+                    ),
                 ]
             )
             | ChatOpenAI(model_name="gpt-4")
@@ -142,6 +150,7 @@ DISTRIBUTE_KEYWORDS_CHAIN = (
 def distribute_keywords(
     *,
     job_description: str,
+    job_title: str,
     position_highlights: list[tuple[int, str, str]],
 ) -> dict[str, list[str]]:
     """Extract ATS keywords from the job description and distribute them among resume positions.
@@ -153,6 +162,7 @@ def distribute_keywords(
     distributed_keywords_raw = DISTRIBUTE_KEYWORDS_CHAIN.invoke(
         {
             "job_description": job_description,
+            "job_title": job_title,
             "position_highlights": "\n-\n".join(
                 f"Key: {i}. Position: {position}\nHighlights:\n{highlights}"
                 for i, position, highlights in position_highlights
