@@ -31,9 +31,9 @@ def cli():
     )
     parser.add_argument(
         "-o",
-        "--output",
-        help="File to output the optimized JSON resume into. Defaults to 'optimized-resume.json'.",
-        default="optimized-resume.json",
+        "--output-file",
+        help="File to output the optimized JSON resume to.",
+        required=True,
     )
     args = parser.parse_args()
     # Use cache to avoid executing some tasks that only use the default resume over and over again
@@ -47,7 +47,7 @@ def cli():
     )
 
     # Save the updated resume to resume.json.
-    with open(args.output, "w") as resume_file:
+    with open(args.output_file, "w") as resume_file:
         resume_file.write(json.dumps(resume, indent=4))
 
 

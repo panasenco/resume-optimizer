@@ -11,5 +11,5 @@ pipx install git+https://github.com/panasenco/resume-optimizer.git
 
 ```
 export OPENAI_API_KEY="..."
-resume-optimizer --resume-file default-resume.json --job-description-file job-description.txt --job-title 'Senior Data Engineer'
+resume-optimizer --resume-file default-resume.json --output-file optimized-resume.json --job-description-file job-description.txt --job-title 'Senior Data Engineer'
 ```
