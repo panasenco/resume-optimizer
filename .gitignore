@@ -1,8 +1,8 @@
-.ignore-*
+**/*.egg-info/
+**/__pycache__/
+**/*.py[cod]
 
-*.egg-info/
-__pycache__/
-*.py[cod]
+**/.ignore-*
 
 .langchain.db
 job-description.txt

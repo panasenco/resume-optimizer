@@ -13,3 +13,27 @@ Your project should be automatically installed.
 ```
 pip install -e .[dev]
 ```
+
+## Formatting and linting
+
+We use [ruff](https://docs.astral.sh/ruff/) for formatting and linting Python code.
+
+### Formatting
+
+```
+ruff format resume_optimizer/
+```
+
+### linting
+
+List errors:
+
+```
+ruff check resume_optimizer/
+```
+
+Auto-fix errors:
+
+```
+ruff check --fix resume_optimizer/
+```

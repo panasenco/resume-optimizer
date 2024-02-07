@@ -2,5 +2,5 @@
 {
 	"name": "resume-optimizer",
 	"image": "mcr.microsoft.com/devcontainers/python:3.12",
-	"updateContentCommand": "pip install -e .[dev]"
+	"updateContentCommand": "pip install --upgrade pip && pip install -e .[dev]"
 }
