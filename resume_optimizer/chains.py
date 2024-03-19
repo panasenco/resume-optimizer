@@ -10,71 +10,104 @@ from langchain_core.prompts.chat import (
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
+EXTRACT_KEYWORDS_CHAIN = (
+    ChatPromptTemplate.from_messages(
+        [
+            SystemMessage(
+                content=dedent(
+                    """\
+                    Background:
+                    You are an expert ATS (applicant tracking system) keyword extractor.
+
+                    Objective:
+                    Extract ATS keywords from the below job description that are relevant to the provided
+                    position title, if any.
+
+                    Combine all ATS keywords from all text sections into a single set.
+
+                    Don't include a college/university degree as an ATS keyword.
+                    WRONG:
+                    - Bachelor's Degree in Computer Science
+
+                    Don't combine multiple ATS keywords into a single one
+                    WRONG:
+                    - Diverse data sources and data formats (xml, json, yaml, parquet, avro, delta)
+                    RIGHT:
+                    - data sources
+                    - data formats
+                    - xml
+                    - json
+                    - yaml
+                    - parquet
+                    - avro
+                    - delta
+
+                    Only include parentheses if it's an abbreviation, otherwise split into multiple keywords.
+                    RIGHT:
+                    - SQL Server Integration Services (SSIS)
+
+                    WRONG:
+                    - Streaming (Kafka)
+                    RIGHT:
+                    - Streaming
+                    - Kafka
+
+                    Output the keywords as a numbered Markdown list, e.g.:
+                    1. Keyword 1
+                    2. Keyword 2
+                    3. Keyword 3
+                    """
+                )
+            ),
+            HumanMessagePromptTemplate.from_template(
+                template=dedent(
+                    """
+                    Job Title: {job_title}
+                    Job Description:
+                    {job_description}
+                    """
+                )
+            ),
+        ]
+    )
+    | ChatOpenAI(model_name="gpt-4")
+    | MarkdownListOutputParser()
+)
+
+
+def extract_keywords(
+    *,
+    job_description: str,
+    job_title: str,
+    position_highlights: list[tuple[int, str, str]],
+) -> dict[str, list[str]]:
+    """Extract ATS keywords from the job description and distribute them among resume positions.
+    Ideally the job description also includes the position name in the format:
+    Position: {Title}
+    Text:
+    {Job description}
+    """
+    distributed_keywords_raw = DISTRIBUTE_KEYWORDS_CHAIN.invoke(
+        {
+            "job_description": job_description,
+            "job_title": job_title,
+            "position_highlights": "\n-\n".join(
+                f"Key: {i}. Position: {position}\nHighlights:\n{highlights}"
+                for i, position, highlights in position_highlights
+            ),
+        }
+    )
+    assert all(key.isnumeric() for key in distributed_keywords_raw), "LLM returned non-integer keys"
+    distributed_keywords = []
+    for i, (key, keywords) in enumerate(distributed_keywords_raw.items()):
+        assert int(key) == i, "LLM didn't return consecutive integer keys starting with 0"
+        distributed_keywords.append(keywords)
+    return distributed_keywords
+
+
 DISTRIBUTE_KEYWORDS_CHAIN = (
     {
-        "job_description_keywords": (
-            ChatPromptTemplate.from_messages(
-                [
-                    SystemMessage(
-                        content=dedent(
-                            """\
-                            Background:
-                            You are an expert ATS (applicant tracking system) keyword extractor.
-
-                            Objective:
-                            Extract ATS keywords from the below job description that are relevant to the provided
-                            position title, if any.
-
-                            Combine all ATS keywords from all text sections into a single set.
-
-                            Don't include a college/university degree as an ATS keyword.
-                            WRONG:
-                            - Bachelor's Degree in Computer Science
-
-                            Don't combine multiple ATS keywords into a single one
-                            WRONG:
-                            - Diverse data sources and data formats (xml, json, yaml, parquet, avro, delta)
-                            RIGHT:
-                            - data sources
-                            - data formats
-                            - xml
-                            - json
-                            - yaml
-                            - parquet
-                            - avro
-                            - delta
-
-                            Only include parentheses if it's an abbreviation, otherwise split into multiple keywords.
-                            RIGHT:
-                            - SQL Server Integration Services (SSIS)
-
-                            WRONG:
-                            - Streaming (Kafka)
-                            RIGHT:
-                            - Streaming
-                            - Kafka
-
-                            Output the keywords as a Markdown list, e.g.:
-                            - Keyword 1
-                            - Keyword 2
-                            - Keyword 3
-                            """
-                        )
-                    ),
-                    HumanMessagePromptTemplate.from_template(
-                        template=dedent(
-                            """
-                            Job Title: {job_title}
-                            Job Description:
-                            {job_description}
-                            """
-                        )
-                    ),
-                ]
-            )
-            | ChatOpenAI(model_name="gpt-4")
-            | StrOutputParser()
-        ),
+        "job_description_keywords": EXTRACT_KEYWORDS_CHAIN,
         "position_highlights": itemgetter("position_highlights"),
     }
     | ChatPromptTemplate.from_messages(
