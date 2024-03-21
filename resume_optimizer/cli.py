@@ -45,7 +45,6 @@ def cli():
         job_description="".join(fileinput.input(files=[args.job_description_file])),
         job_title=args.job_title,
     )
-
     # Save the updated resume to resume.json.
     with open(args.output_file, "w") as resume_file:
         resume_file.write(json.dumps(resume, indent=4))

@@ -2,7 +2,7 @@ from operator import itemgetter
 from textwrap import dedent
 
 from langchain_core.messages import SystemMessage
-from langchain_core.output_parsers import JsonOutputParser, MarkdownListOutputParser, StrOutputParser
+from langchain_core.output_parsers import MarkdownListOutputParser, NumberedListOutputParser, StrOutputParser
 from langchain_core.prompts.chat import (
     HumanMessagePromptTemplate,
     SystemMessagePromptTemplate,
@@ -20,8 +20,8 @@ EXTRACT_KEYWORDS_CHAIN = (
                     You are an expert ATS (applicant tracking system) keyword extractor.
 
                     Objective:
-                    Extract ATS keywords from the below job description that are relevant to the provided
-                    position title, if any.
+                    Extract ATS keywords from the job description provided by the user that are relevant to the provided
+                    job title, if any.
 
                     Combine all ATS keywords from all text sections into a single set.
 
@@ -52,7 +52,7 @@ EXTRACT_KEYWORDS_CHAIN = (
                     - Streaming
                     - Kafka
 
-                    Output the keywords as a numbered Markdown list, e.g.:
+                    Output the keywords as a numbered list, e.g.:
                     1. Keyword 1
                     2. Keyword 2
                     3. Keyword 3
@@ -61,7 +61,7 @@ EXTRACT_KEYWORDS_CHAIN = (
             ),
             HumanMessagePromptTemplate.from_template(
                 template=dedent(
-                    """
+                    """\
                     Job Title: {job_title}
                     Job Description:
                     {job_description}
@@ -71,7 +71,7 @@ EXTRACT_KEYWORDS_CHAIN = (
         ]
     )
     | ChatOpenAI(model_name="gpt-4")
-    | MarkdownListOutputParser()
+    | NumberedListOutputParser()
 )
 
 
@@ -79,135 +79,92 @@ def extract_keywords(
     *,
     job_description: str,
     job_title: str,
-    position_highlights: list[tuple[int, str, str]],
-) -> dict[str, list[str]]:
-    """Extract ATS keywords from the job description and distribute them among resume positions.
-    Ideally the job description also includes the position name in the format:
-    Position: {Title}
-    Text:
-    {Job description}
-    """
-    distributed_keywords_raw = DISTRIBUTE_KEYWORDS_CHAIN.invoke(
+) -> list[str]:
+    """Extract ATS keywords from the job description and distribute them among resume positions."""
+    return EXTRACT_KEYWORDS_CHAIN.invoke(
         {
             "job_description": job_description,
             "job_title": job_title,
-            "position_highlights": "\n-\n".join(
-                f"Key: {i}. Position: {position}\nHighlights:\n{highlights}"
-                for i, position, highlights in position_highlights
-            ),
         }
     )
-    assert all(key.isnumeric() for key in distributed_keywords_raw), "LLM returned non-integer keys"
-    distributed_keywords = []
-    for i, (key, keywords) in enumerate(distributed_keywords_raw.items()):
-        assert int(key) == i, "LLM didn't return consecutive integer keys starting with 0"
-        distributed_keywords.append(keywords)
-    return distributed_keywords
 
 
-DISTRIBUTE_KEYWORDS_CHAIN = (
-    {
-        "job_description_keywords": EXTRACT_KEYWORDS_CHAIN,
-        "position_highlights": itemgetter("position_highlights"),
-    }
-    | ChatPromptTemplate.from_messages(
-        [
-            SystemMessagePromptTemplate.from_template(
-                # Note literal '{' and '}' need to be doubled up in an f-string.
-                # See https://docs.python.org/3/library/string.html#format-string-syntax
-                template=dedent(
-                    """\
+KEYWORD_COMPATIBILITY_CHAIN = ChatPromptTemplate.from_messages(
+    [
+        SystemMessagePromptTemplate.from_template(
+            # Note literal '{' and '}' need to be doubled up in an f-string.
+            # See https://docs.python.org/3/library/string.html#format-string-syntax
+            template=dedent(
+                """\
                     Objective:
-                    Distribute just the following list of ATS (applicant tracking system) keywords among the resume
-                    sections provided by the user:
-                    {job_description_keywords}
+                    Estimate how compatible a resume section is to a list of keywords.
+                    Compatibility values are numbers ranging from 0 to 3:
+                    - 0: The keyword doesn't apply to the resume section at all.
+                    - 1: The keyword weakly applies to the resume section.
+                    - 2: The keyword applies to the resume section.
+                    - 3: The keyword strongly applies to the resume section.
 
-                    ---
-                    
-                    Don't extract any keywords from the text, only take keywords from the list above!
-                    Only assign a keyword to a section when that section could be relevant to that keyword.
-                    Try to assign a keyword to the section that matches it best.
-                    Use as many of the keywords as you can.
+                    Output the compatibilities in a numbered list in sequential order and matching the corresponding
+                    keyword numbers.
 
-                    Don't put competing and/or mutually exclusive technologies into one section.
-                    WRONG: Amazon AWS and Microsoft Azure
-                    WRONG: Google BigQuery and Snowflake
+                    Example:
+                    1. 0
+                    2. 2
+                    3. 3
+                    ...
 
-                    Don't put technologies that wouldn't be found together in a technology stack into one section.
-                    WRONG: Spark SQL and SQL Server Integration Services
-
-                    Spread the keywords out, don't put them all in one section.
-                    The spread of keywords among sections shouldn't be completely uniform, but instead roughly follow
-                    the following weighted distribution:
-                    - 3 parts for the first section
-                    - 3 parts for the second section
-                    - 2 parts for the third section
-                    - 1 part for each subsequent section
-
-                    Output format (use keys from the user input):
-                    {{
-                        "0": [
-                            "ATS Keyword 1",
-                            "ATS Keyword 2"
-                        ],
-                        "1": [
-                            "ATS Keyword 3"
-                        ]
-                    }}
-                    ---
-                    
-                    Only answer with the specified JSON format, no other text.
-                    Maximize the number of ATS keywords matched while spreading them among the sections.
+                    Output the compatibility values for all {n_keywords} keywords in a numbered list, no other text.
                     """
-                ),
             ),
-            HumanMessagePromptTemplate.from_template(template="{position_highlights}"),
-            SystemMessagePromptTemplate.from_template(
-                template=dedent(
-                    """\
-                    REMINDER: DO NOT take any keywords from user input. ONLY use keywords from this list:
-                    {job_description_keywords}
+        ),
+        HumanMessagePromptTemplate.from_template(
+            template=dedent(
+                """\
+                    Resume section:
+                    {resume_section}
+                    
+                    ---
+
+                    Job description keywords:
+                    {numbered_job_description_keywords}
                     """
-                )
             ),
-        ]
-    )
-    | ChatOpenAI(
-        model_name="gpt-4-turbo-preview",
-        model_kwargs={"response_format": {"type": "json_object"}},
-    )
-    | JsonOutputParser()
+        ),
+    ]
+) | ChatOpenAI(
+    model_name="gpt-3.5-turbo",
 )
 
 
-def distribute_keywords(
+def get_compatibility(
     *,
-    job_description: str,
-    job_title: str,
-    position_highlights: list[tuple[int, str, str]],
-) -> dict[str, list[str]]:
-    """Extract ATS keywords from the job description and distribute them among resume positions.
-    Ideally the job description also includes the position name in the format:
-    Position: {Title}
-    Text:
-    {Job description}
-    """
-    distributed_keywords_raw = DISTRIBUTE_KEYWORDS_CHAIN.invoke(
-        {
-            "job_description": job_description,
-            "job_title": job_title,
-            "position_highlights": "\n-\n".join(
-                f"Key: {i}. Position: {position}\nHighlights:\n{highlights}"
-                for i, position, highlights in position_highlights
-            ),
-        }
+    job_description_keywords: list[str],
+    position_highlights: list[tuple[str, str]],
+) -> dict[tuple[int, int], int]:
+    """Compute a compatibility matrix between job description keywords and (position, highlights) resume section tuples."""
+    numbered_keywords = "\n".join(f"{i}. {k}" for i, k in enumerate(job_description_keywords, start=1))
+    print(f"{numbered_keywords=}")
+    raw_compatibilities = KEYWORD_COMPATIBILITY_CHAIN.batch(
+        [
+            {
+                "numbered_job_description_keywords": numbered_keywords,
+                "resume_section": f"Job title: {position}\nHighlights:\n{highlights}",
+                "n_keywords": len(job_description_keywords)
+            }
+            for position, highlights in position_highlights
+        ]
     )
-    assert all(key.isnumeric() for key in distributed_keywords_raw), "LLM returned non-integer keys"
-    distributed_keywords = []
-    for i, (key, keywords) in enumerate(distributed_keywords_raw.items()):
-        assert int(key) == i, "LLM didn't return consecutive integer keys starting with 0"
-        distributed_keywords.append(keywords)
-    return distributed_keywords
+    print(f"{raw_compatibilities=}")
+    dict_compatibilities = [
+        {int(pair[0]): int(pair[1]) for pair in [row.split(". ") for row in section.content.split("\n")]}
+        for section in raw_compatibilities
+    ]
+    print(f"{dict_compatibilities=}")
+    expected_score_keys = list(range(1, len(job_description_keywords) + 1))
+    for compatibility in dict_compatibilities:
+        score_keys = list(compatibility.keys())
+        assert score_keys == expected_score_keys, f"Numbering mismatch: {expected_score_keys=}, {score_keys=}"
+    return [list(compatibility.values()) for compatibility in dict_compatibilities]
 
 
 SUMMARIZE_RESUME_SECTION_CHAIN = (
@@ -265,7 +222,7 @@ SUMMARIZE_RESUME_SECTION_CHAIN = (
 )
 
 
-def summarize_resume_sections(*, position_highlights: list[tuple[int, str, str]]) -> list[str]:
+def summarize_resume_sections(*, position_highlights: list[tuple[str, str]]) -> list[str]:
     # Summarize each section of the default resume to eliminate any ATS keywords that are already there.
     return SUMMARIZE_RESUME_SECTION_CHAIN.batch(
         [
@@ -273,17 +230,18 @@ def summarize_resume_sections(*, position_highlights: list[tuple[int, str, str]]
                 "position": position,
                 "highlights": highlights,
             }
-            for i, position, highlights in position_highlights
+            for position, highlights in position_highlights
         ]
     )
 
 
-def optimize_highlights(
+def insert_keywords(
     position_summary: str,
     position_keywords: list[str],
-    n_highlights: int,
+    highlight_count: int,
+    tokens_per_highlight: int,
     /,
-) -> list[list[str]]:
+) -> list[str]:
     return (
         ChatPromptTemplate.from_messages(
             [
@@ -292,65 +250,65 @@ def optimize_highlights(
                     # See https://docs.python.org/3/library/string.html#format-string-syntax
                     template=dedent(
                         """\
-                        You are an expert resume writer.
-                        Your objective is to turn a resume position summary into a list of {n_highlights} position
-                        highlights that contain the required ATS (applicant tracking system) keywords.
+                    You are an expert resume writer.
+                    Your objective is to turn a resume position summary into a list of {highlight_count} position
+                    highlights that contain the required ATS (applicant tracking system) keywords.
 
-                        Output the highlights as a Markdown list, e.g.:
-                        - Highlight 1
-                        - Highlight 2
-                        - Highlight 3
+                    Output the highlights as a Markdown list, e.g.:
+                    - Highlight 1
+                    - Highlight 2
+                    - Highlight 3
 
-                        POSITION SUMMARY:
-                        {position_summary}
+                    POSITION SUMMARY:
+                    {position_summary}
 
-                        ---
-                        
-                        Write just the highlight string itself without any other metadata in each highlight string.
-                        WRONG:
-                        - Highlight 1: Demonstrated expertise
-                        RIGHT:
-                        - Demonstrated expertise
-                        
-                        Use a third person neutral tone. Avoid pronouns.
-                        WRONG:
-                        - My engineering expertise was pivotal
-                        RIGHT:
-                        - Provided pivotal engineering expertise
-                        
-                        Don't allow quotes around the keywords you insert, sound natural.
+                    ---
+                    
+                    Write just the highlight string itself without any other metadata in each highlight string.
+                    WRONG:
+                    - Highlight 1: Demonstrated expertise
+                    RIGHT:
+                    - Demonstrated expertise
+                    
+                    Use a third person neutral tone. Avoid pronouns.
+                    WRONG:
+                    - My engineering expertise was pivotal
+                    RIGHT:
+                    - Provided pivotal engineering expertise
+                    
+                    Don't allow quotes around the keywords you insert, sound natural.
 
-                        WRONG:
-                        - Streamlined 'data pipelines'
-                        RIGHT:
-                        - Streamlined data pipelines
-                        WRONG:
-                        - Enhanced 'Big data' pipelines
-                        RIGHT:
-                        - Enhanced Big data pipelines
-                        
-                        Only answer with the specified Markdown list format, no other text.
-                        Remember to keep the number of generated highlights to {n_highlights} highlights while inserting
-                        as many provided ATS keywords into them as possible!
-                        """
+                    WRONG:
+                    - Streamlined 'data pipelines'
+                    RIGHT:
+                    - Streamlined data pipelines
+                    WRONG:
+                    - Enhanced 'Big data' pipelines
+                    RIGHT:
+                    - Enhanced Big data pipelines
+                    
+                    Only answer with the specified Markdown list format, no other text.
+                    Remember to keep the number of generated highlights to {highlight_count} highlights while inserting
+                    as many provided ATS keywords into them as possible!
+                    """
                     ),
                 ),
                 HumanMessagePromptTemplate.from_template(
                     template=dedent(
                         """\
-                        Generate position highlights for the following ATS keywords:
-                        {ats_keywords}
-                        """
+                    Generate position highlights for the following ATS keywords:
+                    {position_keywords}
+                    """
                     )
                 ),
             ]
         )
-        | ChatOpenAI(model_name="gpt-4", max_tokens=60 * n_highlights)
+        | ChatOpenAI(model_name="gpt-4", max_tokens=tokens_per_highlight * highlight_count)
         | MarkdownListOutputParser()
     ).invoke(
         {
             "position_summary": position_summary,
-            "ats_keywords": position_keywords,
-            "n_highlights": n_highlights,
+            "position_keywords": position_keywords,
+            "highlight_count": highlight_count,
         }
     )
