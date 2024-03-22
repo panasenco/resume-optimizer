@@ -48,6 +48,8 @@ def cli():
         logging.basicConfig(format="%(message)s", level=logging.INFO)
     elif args.verbose >= 2:
         logging.basicConfig(format="%(message)s", level=logging.DEBUG)
+    else:
+        logging.basicConfig(format="%(message)s", level=logging.WARNING)
     # Use cache to avoid executing some tasks that only use the default resume over and over again
     set_llm_cache(SQLiteCache(database_path=".langchain.db"))
 
