@@ -1,6 +1,7 @@
 import argparse
 import fileinput
 import json
+import logging
 
 from langchain.cache import SQLiteCache
 from langchain.globals import set_llm_cache
@@ -35,7 +36,18 @@ def cli():
         help="File to output the optimized JSON resume to.",
         required=True,
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Verbosity level. -v prints informational messages, -vv prints debug messages.",
+    )
     args = parser.parse_args()
+    if args.verbose == 1:
+        logging.basicConfig(format="%(message)s", level=logging.INFO)
+    elif args.verbose >= 2:
+        logging.basicConfig(format="%(message)s", level=logging.DEBUG)
     # Use cache to avoid executing some tasks that only use the default resume over and over again
     set_llm_cache(SQLiteCache(database_path=".langchain.db"))
 

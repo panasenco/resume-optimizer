@@ -1,4 +1,4 @@
-from operator import itemgetter
+import logging
 from textwrap import dedent
 
 from langchain_core.messages import SystemMessage
@@ -143,7 +143,9 @@ def get_compatibility(
 ) -> dict[tuple[int, int], int]:
     """Compute a compatibility matrix between job description keywords and (position, highlights) resume section tuples."""
     numbered_keywords = "\n".join(f"{i}. {k}" for i, k in enumerate(job_description_keywords, start=1))
-    print(f"{numbered_keywords=}")
+    logging.info("numbered_keywords=")
+    logging.info(numbered_keywords)
+    logging.info("---")
     raw_compatibilities = KEYWORD_COMPATIBILITY_CHAIN.batch(
         [
             {
@@ -154,12 +156,12 @@ def get_compatibility(
             for position, highlights in position_highlights
         ]
     )
-    print(f"{raw_compatibilities=}")
+    logging.debug(f"{raw_compatibilities=}")
     dict_compatibilities = [
         {int(pair[0]): int(pair[1]) for pair in [row.split(". ") for row in section.content.split("\n")]}
         for section in raw_compatibilities
     ]
-    print(f"{dict_compatibilities=}")
+    logging.debug(f"{dict_compatibilities=}")
     expected_score_keys = list(range(1, len(job_description_keywords) + 1))
     for compatibility in dict_compatibilities:
         score_keys = list(compatibility.keys())
