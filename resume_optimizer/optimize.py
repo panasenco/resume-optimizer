@@ -1,4 +1,5 @@
 import json
+import logging
 from multiprocessing import Pool
 from typing import Any
 
@@ -32,18 +33,22 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
         )
         keywords = keywords_result.get()
         position_summaries = position_summaries_result.get()
-    print("keywords=")
-    print(json.dumps(keywords, indent=4))
-    print("---")
-    print("position_summaries=")
-    print(json.dumps(position_summaries, indent=4))
-    print("---")
+    logging.debug("keywords=")
+    logging.debug(json.dumps(keywords, indent=4))
+    logging.debug("---")
+    logging.debug("position_summaries=")
+    logging.debug(json.dumps(position_summaries, indent=4))
+    logging.debug("---")
 
     # Stage 2: Assign keywords to resume sections while maximizing overall compatibility.
     compatibility = get_compatibility(job_description_keywords=keywords, position_highlights=default_highlights)
-    print("compatibility=")
-    print("\n".join(["".join(map(str, row)) for row in compatibility]))
-    print("---")
+    # Print compatibility matrix in compact yet usable format
+    logging.info("compatibility=")
+    logging.info("    " + "".join(f"{d/10:.0f}" if d % 10 == 0 and d > 0 else " " for d in range(1, len(keywords) + 1)))
+    logging.info("    " + "".join(f"{d%10:.0f}" for d in range(1, len(keywords) + 1)))
+    logging.info("    " + "".join("-" for _ in range(len(keywords))))
+    logging.info("\n".join([f"{i+1:<2}| " + "".join(map(str, row)) for i, row in enumerate(compatibility)]))
+    logging.info("---")
     highlight_counts = [3, 3, 2]
     assignment = assign(compatibility=compatibility, count_weights=highlight_counts)
     position_keywords = [
@@ -54,13 +59,13 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
         ]
         for current_resume_section_index in range(len(default_highlights))
     ]
-    print("position_keywords=")
-    print(json.dumps(position_keywords, indent=4))
-    print("---")
+    logging.info("position_keywords=")
+    logging.info(json.dumps(position_keywords, indent=4))
+    logging.info("---")
     # Stage 3: Insert the keywords into the corresponding optimal summarized resume sections
 
     n_experiences = len(default_highlights)
-    print("optimized_highlights=")
+    logging.debug("optimized_highlights=")
     # Have to do a pool rather than run batch() on the chain because the chain itself must be changed depending on
     # how many sections we have to return.
     with Pool(n_experiences) as pool:
@@ -73,8 +78,8 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
                 [60] * n_experiences,
             ),
         )
-    print(optimized_highlights)
-    print("---")
+    logging.debug(optimized_highlights)
+    logging.debug("---")
 
     # Replace the highlights with the generated ones
     for i in range(n_experiences):
