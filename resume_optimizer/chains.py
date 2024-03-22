@@ -96,13 +96,14 @@ KEYWORD_COMPATIBILITY_CHAIN = ChatPromptTemplate.from_messages(
             # See https://docs.python.org/3/library/string.html#format-string-syntax
             template=dedent(
                 """\
-                    Objective:
-                    Estimate how compatible a resume section is to a list of keywords.
+                    Objective: Estimate how compatible a resume section is to a list of keywords.
+
                     Compatibility values are numbers ranging from 0 to 3:
-                    - 0: The keyword doesn't apply to the resume section at all.
-                    - 1: The keyword weakly applies to the resume section.
-                    - 2: The keyword applies to the resume section.
-                    - 3: The keyword strongly applies to the resume section.
+                    - 0: There is no indication that the keyword could apply to the resume section.
+                    - 0: There is no mention of the keyword, and a competing technology keyword is mentioned instead.
+                    - 1: There is some indication that the keyword could apply to the resume section.
+                    - 2: The keyword definitely applies somewhat to the resume section.
+                    - 3: The keyword definitely applies strongly to the resume section.
 
                     Output the compatibilities in a numbered list in sequential order and matching the corresponding
                     keyword numbers.
@@ -114,18 +115,16 @@ KEYWORD_COMPATIBILITY_CHAIN = ChatPromptTemplate.from_messages(
                     ...
 
                     Output the compatibility values for all {n_keywords} keywords in a numbered list, no other text.
+
+                    Resume section to estimate compatibility for:
+                    {resume_section}
                     """
             ),
         ),
         HumanMessagePromptTemplate.from_template(
             template=dedent(
                 """\
-                    Resume section:
-                    {resume_section}
-                    
-                    ---
-
-                    Job description keywords:
+                    Job description keywords to estimate compatibility for:
                     {numbered_job_description_keywords}
                     """
             ),
@@ -133,6 +132,7 @@ KEYWORD_COMPATIBILITY_CHAIN = ChatPromptTemplate.from_messages(
     ]
 ) | ChatOpenAI(
     model_name="gpt-3.5-turbo",
+    # model_name="gpt-4",
 )
 
 
@@ -151,7 +151,7 @@ def get_compatibility(
             {
                 "numbered_job_description_keywords": numbered_keywords,
                 "resume_section": f"Job title: {position}\nHighlights:\n{highlights}",
-                "n_keywords": len(job_description_keywords)
+                "n_keywords": len(job_description_keywords),
             }
             for position, highlights in position_highlights
         ]

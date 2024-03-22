@@ -16,6 +16,7 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
         )
         for experience in resume["work"]
     ]
+
     # Stage 1: Summarize resume sections and extract job description keywords in parallel
     with Pool(2) as pool:
         keywords_result = pool.apply_async(
@@ -48,7 +49,32 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
     logging.info("    " + "".join(f"{d%10:.0f}" for d in range(1, len(keywords) + 1)))
     logging.info("    " + "".join("-" for _ in range(len(keywords))))
     logging.info("\n".join([f"{i+1:<2}| " + "".join(map(str, row)) for i, row in enumerate(compatibility)]))
+    # Remove keywords that don't clearly apply to any job while warning the user.
+    removed_keywords = []
+    x_string = ""
+    # Go in reversed order to not throw off the indexing of subsequent elements when deleting
+    for keyword_index, keyword in reversed(list(enumerate(keywords))):
+        if (
+            max(
+                compatibility[resume_section_index][keyword_index]
+                for resume_section_index in range(len(default_highlights))
+            )
+            == 0
+        ):
+            removed_keywords.append(keyword)
+            x_string += "x"
+            del keywords[keyword_index]
+            for resume_section_index in range(len(default_highlights)):
+                del compatibility[resume_section_index][keyword_index]
+        else:
+            x_string += " "
+    logging.info("    " + x_string[::-1])
     logging.info("---")
+    if len(removed_keywords) > 0:
+        logging.warning(
+            "WARNING: Some keywords won't be inserted because GPT-3.5 couldn't associate them with any resume section:"
+        )
+        logging.warning("\n".join(f"- {keyword}" for keyword in removed_keywords))
     highlight_counts = [3, 3, 2]
     assignment = assign(compatibility=compatibility, count_weights=highlight_counts)
     position_keywords = [
@@ -62,8 +88,8 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
     logging.info("position_keywords=")
     logging.info(json.dumps(position_keywords, indent=4))
     logging.info("---")
-    # Stage 3: Insert the keywords into the corresponding optimal summarized resume sections
 
+    # Stage 3: Insert the keywords into the corresponding optimal summarized resume sections
     n_experiences = len(default_highlights)
     logging.debug("optimized_highlights=")
     # Have to do a pool rather than run batch() on the chain because the chain itself must be changed depending on
