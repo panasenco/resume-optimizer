@@ -10,6 +10,8 @@ from langchain_core.prompts.chat import (
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
+OPENAI_REPRODUCIBILITY_SEED = 338598
+
 EXTRACT_KEYWORDS_CHAIN = (
     ChatPromptTemplate.from_messages(
         [
@@ -89,6 +91,84 @@ def extract_keywords(
     )
 
 
+KEYWORD_DIFFICULTY_CHAIN = ChatPromptTemplate.from_messages(
+    [
+        SystemMessage(
+            content=dedent(
+                """\
+                    Background:
+                    You are an expert job applicant performance predictor.
+                    Your job is to predict how much difficulty job applicants will have with a particular skill.
+
+                    Objective:
+                    Consider the skill associated with each keyword in the provided list.
+                    Assign diffuculty values to the skill based on the given applicant's resume highlights:
+                     1: The skill should be easy for the applicant to learn.
+                     2: The skill might be somewhat difficult for the applicant to learn.
+                     3: The skill might be very difficult for the applicant to learn.
+                    
+                    Output the difficulty score in a numbered list in sequential order and matching the corresponding
+                    keyword numbers.
+
+                    Example:
+                    1. 2
+                    2. 1
+                    3. 3
+                    ...
+
+                    Output the difficulty values for all {n_keywords} keywords in a numbered list, no other text.
+
+                    Resume to estimate keyword-related skill difficulty for:
+                    {resume_sections}
+                    """
+            )
+        ),
+        HumanMessagePromptTemplate.from_template(
+            template=dedent(
+                """\
+                        Job description keywords to estimate difficulty for:
+                        {numbered_job_description_keywords}
+                        """
+            ),
+        ),
+    ]
+) | ChatOpenAI(
+    temperature=0,
+    model_kwargs={"seed": OPENAI_REPRODUCIBILITY_SEED},
+    model_name="gpt-4",
+)
+
+
+def get_difficulties(
+    *,
+    job_description_keywords: list[str],
+    position_highlights: list[tuple[str, str]],
+) -> list[int]:
+    """Compute a compatibility matrix between job description keywords and (position, highlights) resume section tuples."""
+    numbered_keywords = "\n".join(f"{i}. {k}" for i, k in enumerate(job_description_keywords, start=1))
+    logging.info("numbered_keywords=")
+    logging.info(numbered_keywords)
+    logging.info("---")
+    raw_difficulties = KEYWORD_DIFFICULTY_CHAIN.invoke(
+        {
+            "numbered_job_description_keywords": numbered_keywords,
+            "resume_sections": "\n\n".join(
+                f"Job title: {position}\nHighlights:\n{highlights}" for position, highlights in position_highlights
+            ),
+            "n_keywords": len(job_description_keywords),
+        }
+    )
+    logging.debug(f"{raw_difficulties=}")
+    dict_difficulties = {
+        int(pair[0]): int(pair[1]) for pair in [row.split(". ") for row in raw_difficulties.content.split("\n")]
+    }
+    logging.debug(f"{dict_difficulties=}")
+    expected_score_keys = list(range(1, len(job_description_keywords) + 1))
+    score_keys = list(dict_difficulties.keys())
+    assert score_keys == expected_score_keys, f"Numbering mismatch: {expected_score_keys=}, {score_keys=}"
+    return list(dict_difficulties.values())
+
+
 KEYWORD_COMPATIBILITY_CHAIN = ChatPromptTemplate.from_messages(
     [
         SystemMessagePromptTemplate.from_template(
@@ -98,12 +178,10 @@ KEYWORD_COMPATIBILITY_CHAIN = ChatPromptTemplate.from_messages(
                 """\
                     Objective: Estimate how compatible a resume section is to a list of keywords.
 
-                    Compatibility values are numbers ranging from 0 to 3:
+                    Compatibility values are numbers ranging from 0 to 2:
                     - 0: There is no indication that the keyword could apply to the resume section.
-                    - 0: There is no mention of the keyword, and a competing technology keyword is mentioned instead.
                     - 1: There is some indication that the keyword could apply to the resume section.
-                    - 2: The keyword definitely applies somewhat to the resume section.
-                    - 3: The keyword definitely applies strongly to the resume section.
+                    - 2: The keyword definitely applies to the resume section.
 
                     Output the compatibilities in a numbered list in sequential order and matching the corresponding
                     keyword numbers.
@@ -111,7 +189,7 @@ KEYWORD_COMPATIBILITY_CHAIN = ChatPromptTemplate.from_messages(
                     Example:
                     1. 0
                     2. 2
-                    3. 3
+                    3. 1
                     ...
 
                     Output the compatibility values for all {n_keywords} keywords in a numbered list, no other text.
@@ -131,6 +209,8 @@ KEYWORD_COMPATIBILITY_CHAIN = ChatPromptTemplate.from_messages(
         ),
     ]
 ) | ChatOpenAI(
+    temperature=0,
+    model_kwargs={"seed": OPENAI_REPRODUCIBILITY_SEED},
     model_name="gpt-3.5-turbo",
     # model_name="gpt-4",
 )
@@ -143,9 +223,6 @@ def get_compatibility(
 ) -> dict[tuple[int, int], int]:
     """Compute a compatibility matrix between job description keywords and (position, highlights) resume section tuples."""
     numbered_keywords = "\n".join(f"{i}. {k}" for i, k in enumerate(job_description_keywords, start=1))
-    logging.info("numbered_keywords=")
-    logging.info(numbered_keywords)
-    logging.info("---")
     raw_compatibilities = KEYWORD_COMPATIBILITY_CHAIN.batch(
         [
             {
