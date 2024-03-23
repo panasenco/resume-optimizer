@@ -5,7 +5,7 @@ from typing import Any
 
 
 from .assign import assign
-from .chains import extract_keywords, get_compatibility, summarize_resume_sections, insert_keywords
+from .chains import extract_keywords, get_compatibility, get_difficulties, summarize_resume_sections, insert_keywords
 
 
 def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: str) -> dict[str, Any]:
@@ -41,6 +41,10 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
     logging.debug(json.dumps(position_summaries, indent=4))
     logging.debug("---")
 
+    # Stage 2: Estimate keyword difficulty based on the resume
+    difficulties = get_difficulties(job_description_keywords=keywords, position_highlights=default_highlights)
+    logging.info(f"{difficulties=}")
+
     # Stage 2: Assign keywords to resume sections while maximizing overall compatibility.
     compatibility = get_compatibility(job_description_keywords=keywords, position_highlights=default_highlights)
     # Print compatibility matrix in compact yet usable format
@@ -54,12 +58,12 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
     x_string = ""
     # Go in reversed order to not throw off the indexing of subsequent elements when deleting
     for keyword_index, keyword in reversed(list(enumerate(keywords))):
-        if (
-            max(
-                compatibility[resume_section_index][keyword_index]
-                for resume_section_index in range(len(default_highlights))
-            )
-            == 0
+        max_compatibility = max(
+            compatibility[resume_section_index][keyword_index]
+            for resume_section_index in range(len(default_highlights))
+        )
+        if (max_compatibility == 0 and difficulties[keyword_index] >= 2) or (
+            max_compatibility == 1 and difficulties[keyword_index] == 3
         ):
             removed_keywords.append(keyword)
             x_string += "x"
@@ -72,7 +76,8 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
     logging.info("---")
     if len(removed_keywords) > 0:
         logging.warning(
-            "WARNING: Some keywords won't be inserted because GPT-3.5 couldn't associate them with any resume section:"
+            "WARNING: Some keywords won't be inserted because the LLM gauged them as difficult skills that weren't "
+            "mentioned explicitly enough:"
         )
         logging.warning("\n".join(f"- {keyword}" for keyword in removed_keywords))
     highlight_counts = [3, 3, 2]
