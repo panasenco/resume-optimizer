@@ -67,6 +67,7 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
         ):
             removed_keywords.append(keyword)
             x_string += "x"
+            del difficulties[keyword_index]
             del keywords[keyword_index]
             for resume_section_index in range(len(default_highlights)):
                 del compatibility[resume_section_index][keyword_index]
@@ -82,13 +83,18 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
         logging.warning("\n".join(f"- {keyword}" for keyword in removed_keywords))
     highlight_counts = [3, 3, 2]
     assignment = assign(compatibility=compatibility, count_weights=highlight_counts)
-    position_keywords = [
+    # Sorting the assigned keywords in order from most to least difficult encourages the LLM to use the most important
+    # keywords first
+    position_keywords_unsorted = [
         [
-            keywords[keyword_index]
+            (difficulties[keyword_index], keywords[keyword_index])
             for keyword_index, resume_section_index in assignment
             if resume_section_index == current_resume_section_index
         ]
         for current_resume_section_index in range(len(default_highlights))
+    ]
+    position_keywords = [
+        [keyword for _difficulty, keyword in sorted(section, reverse=True)] for section in position_keywords_unsorted
     ]
     logging.info("position_keywords=")
     logging.info(json.dumps(position_keywords, indent=4))

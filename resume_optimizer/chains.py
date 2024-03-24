@@ -345,9 +345,9 @@ def insert_keywords(
                     
                     Write just the highlight string itself without any other metadata in each highlight string.
                     WRONG:
-                    - Highlight 1: Demonstrated expertise
+                    - Highlight 1: Demonstrated expertise in ...
                     RIGHT:
-                    - Demonstrated expertise
+                    - Demonstrated expertise in ...
                     
                     Use a third person neutral tone. Avoid pronouns.
                     WRONG:
@@ -355,8 +355,7 @@ def insert_keywords(
                     RIGHT:
                     - Provided pivotal engineering expertise
                     
-                    Don't allow quotes around the keywords you insert, sound natural.
-
+                    Don't use quotes around the keywords you insert, sound natural.
                     WRONG:
                     - Streamlined 'data pipelines'
                     RIGHT:
@@ -365,6 +364,13 @@ def insert_keywords(
                     - Enhanced 'Big data' pipelines
                     RIGHT:
                     - Enhanced Big data pipelines
+
+                    Associate big accomplishments with keywords corresponding to difficult skills and major, relevant
+                    technologies.
+                    WRONG:
+                    - Developed state-of-the art data architecture using Lucid Charts.
+                    RIGHT:
+                    - Developed state-of-the-art data architecture using Snowflake, Terraform, and dbt.
                     
                     Only answer with the specified Markdown list format, no other text.
                     Remember to keep the number of generated highlights to {highlight_count} highlights while inserting
