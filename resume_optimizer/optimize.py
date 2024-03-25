@@ -8,7 +8,13 @@ from .assign import assign
 from .chains import extract_keywords, get_compatibility, get_difficulties, summarize_resume_sections, insert_keywords
 
 
-def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: str) -> dict[str, Any]:
+def optimize_resume(
+    *,
+    resume: dict[str, Any],
+    job_description: str,
+    job_title: str,
+    tokens_per_highlight: int,
+) -> dict[str, Any]:
     default_highlights = [
         (
             experience["position"],
@@ -148,7 +154,7 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
                 position_summaries,
                 position_keywords,
                 [[3, 3, 2][i] if i < 3 else 1 for i in range(n_experiences)],
-                [60] * n_experiences,
+                [tokens_per_highlight] * n_experiences,
             ),
         )
     logging.debug(optimized_highlights)

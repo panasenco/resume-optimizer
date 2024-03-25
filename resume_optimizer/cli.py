@@ -37,6 +37,13 @@ def cli():
         required=True,
     )
     parser.add_argument(
+        "-k",
+        "--tokens-per-highlight",
+        help="Tokens to generate per highlight. Defaults to 60.",
+        type=int,
+        default=60,
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -58,6 +65,7 @@ def cli():
         resume=json.loads("".join(fileinput.input(files=[args.resume_file]))),
         job_description="".join(fileinput.input(files=[args.job_description_file])),
         job_title=args.job_title,
+        tokens_per_highlight=args.tokens_per_highlight,
     )
     # Save the updated resume to resume.json.
     with open(args.output_file, "w") as resume_file:
