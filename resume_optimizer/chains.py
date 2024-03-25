@@ -96,17 +96,22 @@ KEYWORD_DIFFICULTY_CHAIN = ChatPromptTemplate.from_messages(
         SystemMessage(
             content=dedent(
                 """\
-                    Background:
-                    You are an expert job applicant performance predictor.
-                    Your job is to predict how much difficulty job applicants will have with a particular skill.
+                    Consider an average professional with the job title provided by the user.
+                    Assign difficulty values to each keyword based on how difficult it would be to learn for that
+                    average professional.
+                     1: The keyword corresponds to a skill that would either take less than a month for the average
+                        professional to learn OR is something that the average professional is already expected to know.
+                     2: The keyword corresponds to a vague skill that would take over a month to learn OR a *concrete*
+                        technology or skill that would take between 1 and 3 months for the average professional to
+                        learn.
+                     3: The keyword corresponds to a *concrete* technology or skill that would take over 3 months for
+                        the average professional to learn.
 
-                    Objective:
-                    Consider the skill associated with each keyword in the provided list.
-                    Assign diffuculty values to the skill based on the given applicant's resume highlights:
-                     1: The skill should be easy for the applicant to learn.
-                     2: The skill might be somewhat difficult for the applicant to learn.
-                     3: The skill might be very difficult for the applicant to learn.
-                    
+                    Note that you should only assign the score of 3 to technologies or skills that are both difficult
+                    and *concrete*, not to buzzwords.
+                    E.g. keywords like "modernize for scale" or "building data warehouses" or "cloud stack" should not
+                    ever be assigned a score of 3 because they are vague and buzzwordy.
+
                     Output the difficulty score in a numbered list in sequential order and matching the corresponding
                     keyword numbers.
 
@@ -115,21 +120,21 @@ KEYWORD_DIFFICULTY_CHAIN = ChatPromptTemplate.from_messages(
                     2. 1
                     3. 3
                     ...
-
-                    Output the difficulty values for all {n_keywords} keywords in a numbered list, no other text.
-
-                    Resume to estimate keyword-related skill difficulty for:
-                    {resume_sections}
                     """
             )
         ),
         HumanMessagePromptTemplate.from_template(
             template=dedent(
                 """\
+                        Job title:
+                        {job_title}
                         Job description keywords to estimate difficulty for:
                         {numbered_job_description_keywords}
                         """
             ),
+        ),
+        SystemMessagePromptTemplate.from_template(
+            template="Output the difficulty values for all {n_keywords} keywords in a numbered list, no other text."
         ),
     ]
 ) | ChatOpenAI(
@@ -142,18 +147,14 @@ KEYWORD_DIFFICULTY_CHAIN = ChatPromptTemplate.from_messages(
 def get_difficulties(
     *,
     job_description_keywords: list[str],
-    position_highlights: list[tuple[str, str]],
+    job_title: str,
 ) -> list[int]:
     """Compute a compatibility matrix between job description keywords and (position, highlights) resume section tuples."""
-    numbered_keywords = "\n".join(f"{i}. {k}" for i, k in enumerate(job_description_keywords, start=1))
-    logging.info("numbered_keywords=")
-    logging.info(numbered_keywords)
-    logging.info("---")
     raw_difficulties = KEYWORD_DIFFICULTY_CHAIN.invoke(
         {
-            "numbered_job_description_keywords": numbered_keywords,
-            "resume_sections": "\n\n".join(
-                f"Job title: {position}\nHighlights:\n{highlights}" for position, highlights in position_highlights
+            "job_title": job_title,
+            "numbered_job_description_keywords": "\n".join(
+                f"{i}. {k}" for i, k in enumerate(job_description_keywords, start=1)
             ),
             "n_keywords": len(job_description_keywords),
         }
@@ -194,18 +195,21 @@ KEYWORD_COMPATIBILITY_CHAIN = ChatPromptTemplate.from_messages(
 
                     Output the compatibility values for all {n_keywords} keywords in a numbered list, no other text.
 
-                    Resume section to estimate compatibility for:
-                    {resume_section}
                     """
             ),
         ),
         HumanMessagePromptTemplate.from_template(
             template=dedent(
                 """\
+                    Resume section to estimate compatibility for:
+                    {resume_section}
                     Job description keywords to estimate compatibility for:
                     {numbered_job_description_keywords}
                     """
             ),
+        ),
+        SystemMessagePromptTemplate.from_template(
+            template="Output the compatibility values for all {n_keywords} keywords in a numbered list, no other text."
         ),
     ]
 ) | ChatOpenAI(

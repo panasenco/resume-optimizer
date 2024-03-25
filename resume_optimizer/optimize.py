@@ -34,73 +34,109 @@ def optimize_resume(*, resume: dict[str, Any], job_description: str, job_title: 
         )
         keywords = keywords_result.get()
         position_summaries = position_summaries_result.get()
-    logging.debug("keywords=")
-    logging.debug(json.dumps(keywords, indent=4))
-    logging.debug("---")
+    logging.info("keywords=")
+    logging.info("\n".join(f"{i+1}. {k}" for i, k in enumerate(keywords)))
+    logging.info("---")
     logging.debug("position_summaries=")
     logging.debug(json.dumps(position_summaries, indent=4))
     logging.debug("---")
 
-    # Stage 2: Estimate keyword difficulty based on the resume
-    difficulties = get_difficulties(job_description_keywords=keywords, position_highlights=default_highlights)
-    logging.info(f"{difficulties=}")
+    # Stage 2: Assign special compatibility level of 3 to keywords that appear verbatim in the default resume
+    compatibility = [[None for _k in range(len(keywords))] for _r in range(len(default_highlights))]
+    present_keyword_indices = set()
+    for resume_section_index, (position, highlights) in enumerate(default_highlights):
+        logging.debug(f"{highlights=}")
+        for keyword_index, keyword in enumerate(keywords):
+            if keyword.lower() in position.lower() or keyword.lower() in highlights.lower():
+                compatibility[resume_section_index][keyword_index] = 3
+                present_keyword_indices.add(keyword_index)
+    # Set all other compatibilities for present keywords to zero
+    for resume_section_index in range(len(default_highlights)):
+        for present_keyword_index in present_keyword_indices:
+            if compatibility[resume_section_index][present_keyword_index] is None:
+                compatibility[resume_section_index][present_keyword_index] = 0
+    logging.info(f"Keywords present in default resume = {[i+1 for i in present_keyword_indices]}")
+    logging.debug(f"{compatibility=}")
 
-    # Stage 2: Assign keywords to resume sections while maximizing overall compatibility.
-    compatibility = get_compatibility(job_description_keywords=keywords, position_highlights=default_highlights)
+    # Stage 3: Estimate keyword difficulty based on the job title
+    difficulties = get_difficulties(job_description_keywords=keywords, job_title=job_title)
+    logging.info("difficulties=")
+    logging.info("\n".join(f"{i+1}. {d}" for i, d in enumerate(difficulties)))
+    logging.info("---")
+    # Remove difficult keywords that are not verbatim in the default resume
+    removed_keyword_indices = {
+        keyword_index
+        for keyword_index, difficulty in enumerate(difficulties)
+        if difficulty >= 3 and keyword_index not in present_keyword_indices
+    }
+    if len(removed_keyword_indices) > 0:
+        logging.warning(
+            "WARNING: Some keywords won't be inserted because the LLM gauged them as very difficult skills and "
+            "they weren't mentioned explicitly in the default resume:"
+        )
+        logging.warning("\n".join(f"- {keywords[keyword_index]}" for keyword_index in removed_keyword_indices))
+        logging.info("---")
+
+    # Stage 4: Assign keywords that are neither present verbatim nor too difficult to resume sections while maximizing
+    # overall compatibility.
+    questionable_keyword_indices = sorted(set(range(len(keywords))) - present_keyword_indices - removed_keyword_indices)
+    questionable_compatibility = get_compatibility(
+        job_description_keywords=[keywords[i] for i in questionable_keyword_indices],
+        position_highlights=default_highlights,
+    )
+    for resume_section_index in range(len(default_highlights)):
+        for sequential_keyword_index, questionable_keyword_index in enumerate(questionable_keyword_indices):
+            compatibility[resume_section_index][questionable_keyword_index] = questionable_compatibility[
+                resume_section_index
+            ][sequential_keyword_index]
     # Print compatibility matrix in compact yet usable format
     logging.info("compatibility=")
     logging.info("    " + "".join(f"{d/10:.0f}" if d % 10 == 0 and d > 0 else " " for d in range(1, len(keywords) + 1)))
     logging.info("    " + "".join(f"{d%10:.0f}" for d in range(1, len(keywords) + 1)))
     logging.info("    " + "".join("-" for _ in range(len(keywords))))
-    logging.info("\n".join([f"{i+1:<2}| " + "".join(map(str, row)) for i, row in enumerate(compatibility)]))
-    # Remove keywords that don't clearly apply to any job while warning the user.
-    removed_keywords = []
-    x_string = ""
-    # Go in reversed order to not throw off the indexing of subsequent elements when deleting
-    for keyword_index, keyword in reversed(list(enumerate(keywords))):
-        max_compatibility = max(
-            compatibility[resume_section_index][keyword_index]
-            for resume_section_index in range(len(default_highlights))
+    logging.info(
+        "\n".join(
+            [
+                f"{i+1:<2}| " + "".join([str(v) if v is not None else "N" for v in row])
+                for i, row in enumerate(compatibility)
+            ]
         )
-        if (max_compatibility == 0 and difficulties[keyword_index] >= 2) or (
-            max_compatibility == 1 and difficulties[keyword_index] == 3
-        ):
-            removed_keywords.append(keyword)
-            x_string += "x"
-            del difficulties[keyword_index]
-            del keywords[keyword_index]
-            for resume_section_index in range(len(default_highlights)):
-                del compatibility[resume_section_index][keyword_index]
-        else:
-            x_string += " "
-    logging.info("    " + x_string[::-1])
+    )
     logging.info("---")
-    if len(removed_keywords) > 0:
-        logging.warning(
-            "WARNING: Some keywords won't be inserted because the LLM gauged them as difficult skills that weren't "
-            "mentioned explicitly enough:"
+    # Stage 5: Assign undeleted keywords to resume sections
+    # Sorting the keywords in order from most to least difficult encourages the LLM to use the most important ones first
+    difficulty_sorted_keyword_indices = [
+        sorted_keyword_index
+        for _difficulty, sorted_keyword_index in sorted(
+            [
+                (difficulties[keyword_index], keyword_index)
+                for keyword_index in (set(range(len(keywords))) - removed_keyword_indices)
+            ],
+            reverse=True,
         )
-        logging.warning("\n".join(f"- {keyword}" for keyword in removed_keywords))
+    ]
     highlight_counts = [3, 3, 2]
-    assignment = assign(compatibility=compatibility, count_weights=highlight_counts)
-    # Sorting the assigned keywords in order from most to least difficult encourages the LLM to use the most important
-    # keywords first
-    position_keywords_unsorted = [
+    assignment = assign(
+        compatibility=[
+            [compatibility_row[keyword_index] for keyword_index in difficulty_sorted_keyword_indices]
+            for compatibility_row in compatibility
+        ],
+        count_weights=highlight_counts,
+    )
+    logging.debug(f"{assignment=}")
+    position_keywords = [
         [
-            (difficulties[keyword_index], keywords[keyword_index])
-            for keyword_index, resume_section_index in assignment
+            keywords[difficulty_sorted_keyword_indices[internal_index]]
+            for internal_index, resume_section_index in assignment
             if resume_section_index == current_resume_section_index
         ]
         for current_resume_section_index in range(len(default_highlights))
-    ]
-    position_keywords = [
-        [keyword for _difficulty, keyword in sorted(section, reverse=True)] for section in position_keywords_unsorted
     ]
     logging.info("position_keywords=")
     logging.info(json.dumps(position_keywords, indent=4))
     logging.info("---")
 
-    # Stage 3: Insert the keywords into the corresponding optimal summarized resume sections
+    # Stage 6: Insert the keywords into the corresponding optimal summarized resume sections
     n_experiences = len(default_highlights)
     logging.debug("optimized_highlights=")
     # Have to do a pool rather than run batch() on the chain because the chain itself must be changed depending on
