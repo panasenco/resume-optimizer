@@ -1,4 +1,5 @@
 import logging
+from operator import itemgetter
 from textwrap import dedent
 
 from langchain_core.messages import SystemMessage
@@ -8,6 +9,7 @@ from langchain_core.prompts.chat import (
     SystemMessagePromptTemplate,
 )
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI
 
 OPENAI_REPRODUCIBILITY_SEED = 338598
@@ -173,8 +175,6 @@ def get_difficulties(
 KEYWORD_COMPATIBILITY_CHAIN = ChatPromptTemplate.from_messages(
     [
         SystemMessagePromptTemplate.from_template(
-            # Note literal '{' and '}' need to be doubled up in an f-string.
-            # See https://docs.python.org/3/library/string.html#format-string-syntax
             template=dedent(
                 """\
                     Objective: Estimate how compatible a resume section is to a list of keywords.
@@ -319,6 +319,7 @@ def summarize_resume_sections(*, position_highlights: list[tuple[str, str]]) -> 
 
 
 def insert_keywords(
+    job_title: str,
     position_summary: str,
     position_keywords: list[str],
     highlight_count: int,
@@ -329,66 +330,54 @@ def insert_keywords(
         ChatPromptTemplate.from_messages(
             [
                 SystemMessagePromptTemplate.from_template(
-                    # Note literal '{' and '}' need to be escaped by doubling in an f-string.
-                    # See https://docs.python.org/3/library/string.html#format-string-syntax
                     template=dedent(
                         """\
-                    You are an expert resume writer.
-                    Your objective is to turn a resume position summary into a list of {highlight_count} position
-                    highlights that contain the required ATS (applicant tracking system) keywords.
+                        You are a resume writer, expert in tailoring resumes to jobs with the title {job_title}.
+                        Your objective is to turn a resume position summary into a list of position highlights that
+                        contain the required ATS (applicant tracking system) keywords.
 
-                    Output the highlights as a Markdown list, e.g.:
-                    - Highlight 1
-                    - Highlight 2
-                    - Highlight 3
-
-                    POSITION SUMMARY:
-                    {position_summary}
-
-                    ---
-                    
-                    Write just the highlight string itself without any other metadata in each highlight string.
-                    WRONG:
-                    - Highlight 1: Demonstrated expertise in ...
-                    RIGHT:
-                    - Demonstrated expertise in ...
-                    
-                    Use a third person neutral tone. Avoid pronouns.
-                    WRONG:
-                    - My engineering expertise was pivotal
-                    RIGHT:
-                    - Provided pivotal engineering expertise
-                    
-                    Don't use quotes around the keywords you insert, sound natural.
-                    WRONG:
-                    - Streamlined 'data pipelines'
-                    RIGHT:
-                    - Streamlined data pipelines
-                    WRONG:
-                    - Enhanced 'Big data' pipelines
-                    RIGHT:
-                    - Enhanced Big data pipelines
-
-                    Associate big accomplishments with keywords corresponding to difficult skills and major, relevant
-                    technologies.
-                    WRONG:
-                    - Developed state-of-the art data architecture using Lucid Charts.
-                    RIGHT:
-                    - Developed state-of-the-art data architecture using Snowflake, Terraform, and dbt.
-                    
-                    Only answer with the specified Markdown list format, no other text.
-                    Remember to keep the number of generated highlights to {highlight_count} highlights while inserting
-                    as many provided ATS keywords into them as possible!
-                    """
+                        Write just the highlight string itself without any other metadata in each highlight string.
+                        WRONG:
+                        - Highlight 1: Demonstrated expertise in ...
+                        RIGHT:
+                        - Demonstrated expertise in ...
+                        
+                        Associate big accomplishments with keywords corresponding to difficult skills and major,
+                        relevant technologies.
+                        WRONG:
+                        - Developed state-of-the art data architecture using Lucid Charts.
+                        RIGHT:
+                        - Developed state-of-the-art data architecture using Snowflake, Terraform, and dbt.
+                        """
                     ),
                 ),
                 HumanMessagePromptTemplate.from_template(
                     template=dedent(
                         """\
-                    Generate position highlights for the following ATS keywords:
-                    {position_keywords}
-                    """
+                        Job title to optimize for: {job_title}.
+                        Position summmary to insert keywords into:
+                        {position_summary}
+
+                        ------
+
+                        ATS keywords to inject into the position summary:
+                        {position_keywords}
+                        """
                     )
+                ),
+                SystemMessagePromptTemplate.from_template(
+                    template=dedent(
+                        """\
+                        Output the {highlight_count} highlights as a Markdown list, e.g.:
+                        - Highlight 1
+                        - Highlight 2
+                        - Highlight 3
+
+                        Only answer with the specified Markdown list format, no other text.
+                        Remember to keep the number of generated highlights to {highlight_count} highlights while
+                        inserting as many provided ATS keywords into them as possible!
+                        """
+                    ),
                 ),
             ]
         )
@@ -396,8 +385,115 @@ def insert_keywords(
         | MarkdownListOutputParser()
     ).invoke(
         {
+            "job_title": job_title,
             "position_summary": position_summary,
             "position_keywords": position_keywords,
             "highlight_count": highlight_count,
         }
+    )
+
+
+def refine_highlights(
+    *,
+    job_title: str,
+    highlights_keywords: list[tuple[str, list[str]]],
+    tokens_per_highlight: int,
+) -> list[str]:
+    logging.debug(f"{highlights_keywords=}")
+    batch_input = [
+        {
+            "job_title": job_title,
+            "resume_section": resume_section,
+            "keywords": "\n".join(f"- {keyword}" for keyword in keywords),
+            "tokens_per_highlight": tokens_per_highlight,
+        }
+        for resume_section, keywords in highlights_keywords
+    ]
+    logging.debug(f"{batch_input=}")
+    return (
+        {
+            "section_criticisms": (
+                ChatPromptTemplate.from_messages(
+                    [
+                        SystemMessagePromptTemplate.from_template(
+                            template=dedent(
+                                """\
+                            You are a manager hiring for a position with the title '{job_title}'.
+                            Your objective is to evaluate a resume section.
+
+                            Think step by step. List weaknesses that exist within the section, if any.
+                            Some examples to consider:
+                            - Does the person appear professional by writing in a third person, neutral tone?
+                                WRONG:
+                                - My engineering expertise was pivotal
+                                RIGHT:
+                                - Provided pivotal engineering expertise
+                            - Does the person appear unnatural by using quotes around some keywords?
+                                WRONG:
+                                - Streamlined 'data pipelines'
+                                RIGHT:
+                                - Streamlined data pipelines
+                                WRONG:
+                                - Enhanced 'Big data' pipelines
+                                RIGHT:
+                                - Enhanced Big data pipelines
+                            
+                            Don't limit yourself to the above examples, think of any other shortcomings of the section
+                            from the perspective of a manager hiring for a '{job_title}' job that make the candidate appear
+                            unprofessional, illogical, or unnatural.
+                            """
+                            ),
+                        ),
+                        HumanMessagePromptTemplate.from_template(template="Resume section:\n{resume_section}"),
+                    ]
+                )
+                | ChatOpenAI(model_name="gpt-4")
+                | StrOutputParser()
+            ),
+            "job_title": itemgetter("job_title"),
+            "keywords": itemgetter("keywords"),
+            "resume_section": itemgetter("resume_section"),
+            "tokens_per_highlight": itemgetter("tokens_per_highlight"),
+        }
+        | ChatPromptTemplate.from_messages(
+            [
+                SystemMessagePromptTemplate.from_template(
+                    template=dedent(
+                        """\
+                        You are a resume writer, expert in tailoring resumes to jobs with the title {job_title}.
+                        Rewrite the provided resume section using the provided criticisms.
+                        IMPORTANT: Be careful to not remove the provided ATS keywords while rewriting!
+                        Limit the output to {tokens_per_highlight} tokens.
+                        """
+                    ),
+                ),
+                HumanMessagePromptTemplate.from_template(
+                    template=dedent(
+                        """\
+                        Job title to optimize for: {job_title}.
+                        Resume section:
+                        {resume_section}
+                        ---
+                        Criticisms:
+                        {section_criticisms}
+                        ---
+                        ATS keywords to preserve:
+                        {keywords}
+                        """
+                    )
+                ),
+            ]
+        )
+        | ChatOpenAI(model_name="gpt-4", max_tokens=tokens_per_highlight)
+        | StrOutputParser()
+    ).batch(
+        [
+            {
+                "job_title": job_title,
+                "resume_section": resume_section,
+                "keywords": "\n".join(f"- {keyword}" for keyword in keywords),
+                "tokens_per_highlight": tokens_per_highlight,
+            }
+            for resume_section, keywords in highlights_keywords
+        ]
     )

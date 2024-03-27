@@ -5,7 +5,14 @@ from typing import Any
 
 
 from .assign import assign
-from .chains import extract_keywords, get_compatibility, get_difficulties, summarize_resume_sections, insert_keywords
+from .chains import (
+    extract_keywords,
+    get_compatibility,
+    get_difficulties,
+    summarize_resume_sections,
+    insert_keywords,
+    refine_highlights,
+)
 
 
 def optimize_resume(
@@ -151,17 +158,37 @@ def optimize_resume(
         optimized_highlights = pool.starmap(
             func=insert_keywords,
             iterable=zip(
+                job_title,
                 position_summaries,
                 position_keywords,
-                [[3, 3, 2][i] if i < 3 else 1 for i in range(n_experiences)],
+                [highlight_counts[i] if i < len(highlight_counts) else 1 for i in range(n_experiences)],
                 [tokens_per_highlight] * n_experiences,
             ),
         )
     logging.debug(optimized_highlights)
     logging.debug("---")
 
-    # Replace the highlights with the generated ones
-    for i in range(n_experiences):
-        resume["work"][i]["highlights"] = optimized_highlights[i]
+    # Stage 7: Refine the optimized resume sections
+    logging.debug("refined_highlights=")
+    refined_highlights = refine_highlights(
+        job_title=job_title,
+        highlights_keywords=[
+            (highlight, position_keywords[section_index])
+            for section_index, section in enumerate(optimized_highlights)
+            for highlight in section
+        ],
+        tokens_per_highlight=tokens_per_highlight,
+    )
+    logging.debug(refined_highlights)
+    logging.debug("---")
+
+    # Replace the highlights with the refined ones
+    highlight_index = 0
+    for experience_index in range(n_experiences):
+        n_highlights = highlight_counts[experience_index] if experience_index < len(highlight_counts) else 1
+        resume["work"][experience_index]["highlights"] = refined_highlights[
+            highlight_index : highlight_index + n_highlights
+        ]
+        highlight_index += n_highlights
 
     return resume
